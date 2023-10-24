@@ -26,3 +26,22 @@ accounts <- vroom(here("data", "account.csv"))
 disp <- vroom(here("data", "disp.csv"))
 ```
 
+
+## Joining data tables
+A collection of joining functions of the form '*_join'.
+
+### Inner join
+
+```{r da}
+da <- inner_join(accounts, disp) ## merges data using the one same variable (account_id here)
+```
+
+```{r cda}
+cda <- inner_join(clients, da, by = join_by(client_id), suffix = c("_home", "_bank")) 
+#join - look for common vars and join on those vars, but here leads to removal of some values (~10%) which have mismatching values for a var (due to moving...- don't live where the bank is) so have to add specification of joinby
+#by = join by makes two vers of other common var - district_id.x/y - can rename
+```
+
+
+
+
