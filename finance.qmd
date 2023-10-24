@@ -1,0 +1,28 @@
+---
+title: "Financial data analysis"
+author: "Arina Agaronyan"
+format: 
+  html: 
+    echo: false 
+---
+
+```{r config}
+#| message: false
+here::i_am("dplyr-102.Rproj")
+library(here)
+library(vroom) ## or readr
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+theme_set(theme_bw())
+```
+
+## Data loading
+
+```{r load_data}
+#| message: false
+clients <- vroom(here("data", "client.csv")) ## split file name into directories, then file name
+accounts <- vroom(here("data", "account.csv"))
+disp <- vroom(here("data", "disp.csv"))
+```
+
