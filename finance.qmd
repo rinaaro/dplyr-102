@@ -43,5 +43,57 @@ cda <- inner_join(clients, da, by = join_by(client_id), suffix = c("_home", "_ba
 ```
 
 
+### Home district vs Bank district
+
+```{r home_diff}
+home_diff_bank <- cda |>
+  filter(district_id_home != district_id_bank) |> ## != not equal to
+  nrow()
+```
+We observe that `r home_diff_bank` clients have a bank in another district than the one they live in.
+
+(May be overestimation due to families, so check clients who share account but don't live together)
+```{r filter_home_diff}
+cda |> 
+  group_by(account_id) |>
+  distinct(district_id_home) |>
+  summarise(N=n()) |>
+  filter(N>1)
+```
+(nevermind)
 
 
+### Gender gap?
+
+```{r countG}
+clients |> count(gender)
+```
+
+```{r}
+clients |>
+  ggplot(aes(y=gender)) +
+  geom_bar() ## if long vaues on geom_bar, better on y axis. can originally put x= then + coord_flip()
+```
+
+Acount distribution
+```{r}
+cda |>
+  count(gender, type) |>
+  group_by(gender)|>
+  mutate(freq=n/sum(n))|>
+  select(-n) |> 
+  ungroup() |>
+  pivot_wider(values_from = freq, names_from = type)
+```
+
+```{r}
+cda |>
+  ggplot(aes(y=gender, fill=type)) +
+  geom_bar(position = "fill")
+```
+
+```{r}
+chisq.test(cda |> pull(gender), 
+           cda |> pull(type))
+```
+p-value=0.5, can't reject null hypothesis of independence
