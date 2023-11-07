@@ -186,10 +186,12 @@ Want a better view of AB on one side and CD on other - use geom_bar to simplify
   filter(status %in% c("A", "B")) |>
   ggplot(aes(x=status)) +
   geom_bar()) +
+  ggtitle("Past loans")+
 (loan |>
   filter(status %in% c("C", "D")) |>
   ggplot(aes(x=status)) +
-  geom_bar())
+  geom_bar()) +
+  labs(title="Ongoing loans", x="Status")
 ```
 current vs past loans =- new column to say whether loan is active or finished
 ```{r}
@@ -219,7 +221,146 @@ ggplot(loan, aes(y=active, fill = default))+
   geom_bar(position = "fill")
 ```
 
-want each var to describe a single feature - untangling - easier to leverage into graphical representations, teste, etc...
+want each var to describe a single feature - untangling - easier to leverage into graphical representations, test, etc...
+
+
+### Combined analysis
+
+cross-referencing data - selection bias? - introducing potential condounding vars that induce correlation in factors that have no causal relationship
+```{r}
+loan_cda <- 
+  loan |>
+  inner_join(cda, by = join_by(account_id), suffix = c("_loan", "_account"))
+#multiple clients in same account, so more rows than in loan df
+# gives access to info about if n of ppl in account affects quality of loan
+```
+
+
+```{r}
+loan_cda |>
+  group_by(loan_id) |>
+  mutate(nb_client = n()) |>
+  slice_head() |> #each loan shows up once now for the first client (no disponent)
+  select(-client_id, -gender, -birth_date) |> 
+#no longer represent client characteristics as only one client selected
+  ungroup() |>
+ggplot(aes(y=nb_client, fill = default))+
+  geom_bar()
+```
+no default when 2 ppl associated with loan
+
+
+```{r}
+clients_wo_loan <- cda |>
+  anti_join(loan, by = join_by(account_id)) 
+#keep rows of cda that don't have a matching row in loan
+clients_w_loan <- cda |>
+  semi_join(loan, by = join_by(account_id))
+```
+
+compare clients with loan vs without - analyse selection effect
+is there effect of sharing an account? - reimbursing effect or selection effect
+```{r}
+(clients_wo_loan |> 
+  group_by(account_id) |>
+  summarise(nb_client = n()) |>
+ggplot(aes(y=nb_client))+
+  geom_bar()+
+  ggtitle("Without loan")) /
+(clients_w_loan |> 
+  group_by(account_id) |>
+  summarise(nb_client = n()) |>
+ggplot(aes(y=nb_client))+
+  geom_bar() +
+  ggtitle("With loan"))
+```
+if there is a selection effect its probably overemphasizing the n of ppl sharing account????????? if you share an account, it lets you reimburse the loan easier than if you were alone
+
+
+
+bind 2 dfs by row/col - stacking dataframes
+
+
+```{r}
+merged_clients <- 
+  bind_rows(
+    with = clients_w_loan,
+    without = clients_wo_loan,
+    .id = "loan" #name associated with stacking
+  )
+```
+
+process df for graphical rep - can condition on n of clients
+
+```{r}
+merged_clients |>
+  group_by(account_id) |>
+  mutate(nb_clients = n()) |>
+  slice_head() |>
+  ungroup() |>
+ggplot(aes(y=nb_clients, fill=loan)) +
+  geom_bar(position = "fill")
+```
+see percentage of loans among diff n of users of account
+
+nb of clients is not very dependent on loan or no
+
+
+
+bc single df, can do classical test over data
+
+```{r}
+accounts_loan <- 
+  merged_clients |>
+  group_by(account_id) |>
+  mutate(nb_clients = n()) |>
+  slice_head() |>
+  ungroup()
+
+chisq.test(accounts_loan |> pull(loan), #loan or not
+           accounts_loan |> pull(nb_clients))
+```
+independence can't be rejected at reasonable level
+idk how nb_clients is interpreted, so add as.factor to make discrete
+
+
+### Alternative solutions
+
+Best
+```{r}
+person_per_account <- 
+  cda |>
+  count(account_id) #similar to group_by |> summarise
+```
+join to loan df, will not have replicated accounts
+```{r}
+loan |>
+  inner_join(person_per_account, by = join_by(account_id))
+```
+
+
+Other
+```{r}
+loan_cda |>
+  group_by(default, loan_id) |> #can add all vars unique to loan id
+  summarise(n=n(), .groups = "drop")
+```
+unique default for each loan id
+group by default is useless but it keeps the value in the table, so drop all groups
+the more vars, the slower the process?
+can be misleading...grouping then dropping?
+
+
+
+Other2
+```{r}
+cda |>
+  left_join(loan |>
+              select(account_id, default), by = join_by(account_id)) |>
+  mutate(loan = if_else(is.na(default), "Without", "With"))
+```
+each NA corresponds to rows missing a match when joined
+can add col
 
 
 
